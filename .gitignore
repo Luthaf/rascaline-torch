@@ -1,0 +1,5 @@
+.tox/
+dist/
+build/
+*.egg-info
+virtualenv/

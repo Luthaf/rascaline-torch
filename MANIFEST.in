@@ -1,0 +1,3 @@
+recursive-include rascaline_torch *
+include pyproject.toml
+include CMakeLists.txt

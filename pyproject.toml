@@ -1,0 +1,25 @@
+[build-system]
+requires = [
+    "setuptools >=44",
+    "wheel >=0.36",
+    "torch >=1.9,<1.10",
+    "rascaline @ https://github.com/Luthaf/rascaline/archive/a5028b3.zip",
+    "cmake",
+]
+build-backend = "setuptools.build_meta"
+
+[tool.tox]
+legacy_tox_ini = """
+[tox]
+
+[testenv]
+skip_install = True
+deps =
+    discover
+    torch >=1.9,<1.10
+    rascaline @ https://github.com/Luthaf/rascaline/archive/a5028b3.zip
+
+commands =
+    python setup.py --quiet install
+    discover -p "*.py" -s tests
+"""
