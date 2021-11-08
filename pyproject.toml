@@ -3,7 +3,7 @@ requires = [
     "setuptools >=44",
     "wheel >=0.36",
     "torch >=1.9,<1.10",
-    "rascaline @ https://github.com/Luthaf/rascaline/archive/a5028b3.zip",
+    "rascaline @ https://github.com/Luthaf/rascaline/archive/55009d4.zip",
     "cmake",
 ]
 build-backend = "setuptools.build_meta"
@@ -16,8 +16,9 @@ legacy_tox_ini = """
 skip_install = True
 deps =
     discover
+    ase
     torch >=1.9,<1.10
-    rascaline @ https://github.com/Luthaf/rascaline/archive/a5028b3.zip
+    rascaline @ https://github.com/Luthaf/rascaline/archive/55009d4.zip
 
 commands =
     python setup.py --quiet install

@@ -60,7 +60,9 @@ class cmake_ext(build_ext):
         assert len(files) == 1
         libfile = files[0]
 
-        output = os.path.join(self.build_lib, "rascaline_torch", "_rascaline_torch.so")
+        output = os.path.join(
+            ROOT, self.build_lib, "rascaline_torch", "_rascaline_torch.so"
+        )
         self.copy_file(libfile, output)
 
 

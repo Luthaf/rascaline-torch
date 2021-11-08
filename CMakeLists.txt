@@ -54,10 +54,18 @@ if (BUILD_FOR_PYTHON)
     set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};${RASCALINE_CMAKE_PATH_OUTPUT}")
 endif(BUILD_FOR_PYTHON)
 
-find_package(Torch 1.8 REQUIRED)
+find_package(Torch 1.9 REQUIRED)
 find_package(rascaline 0.1 REQUIRED)
 
-add_library(rascaline_torch SHARED rascaline_torch/torch.cpp)
+set_property(TARGET caffe2::mkl PROPERTY INTERFACE_LINK_LIBRARIES)
+set_property(TARGET caffe2::mkldnn PROPERTY INTERFACE_LINK_LIBRARIES)
+
+add_library(rascaline_torch SHARED
+    rascaline_torch/system.cpp
+    rascaline_torch/autograd.cpp
+    rascaline_torch/descriptor.cpp
+    rascaline_torch/register.cpp
+)
 target_link_libraries(rascaline_torch torch rascaline)
 
 install(TARGETS rascaline_torch
