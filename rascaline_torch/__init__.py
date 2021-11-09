@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from collections import namedtuple
-from typing import Dict, List, Any, Union, NamedTuple
+from typing import Dict, List, Any, Union, NamedTuple, Optional
 
 import torch
 from torch import Tensor
@@ -78,6 +78,7 @@ def as_torch_system(frame, requires_grad=False):
 
 class Calculator(torch.nn.Module):
     def __init__(self, calculator, species):
+        """TODO"""
         super().__init__()
 
         if not isinstance(calculator, CalculatorBase):
@@ -95,7 +96,7 @@ class Calculator(torch.nn.Module):
 
         species = np.unique(np.array(species, dtype=np.int32))
         if calculator.c_name == "spherical_expansion":
-            all_species = list(species)
+            all_species = [[s] for s in species]
         elif calculator.c_name == "soap_power_spectrum":
             all_species = []
             for s1 in species:
@@ -105,10 +106,15 @@ class Calculator(torch.nn.Module):
         else:
             raise Exception("unknown calculator, please edit this file")
 
-        self.options = {"TODO": torch.tensor(all_species)}
+        self.densify_species = torch.tensor(all_species)
         self.n_features = calculator.features_count() * len(all_species)
 
-    def forward(self, system: System):
+    def forward(
+        self,
+        system: System,
+        options: Optional[Dict[str, torch.Tensor]] = None,
+    ):
+        """TODO"""
         # C++ code uses dictionaries since there are no named tuples there, and
         # pytorch can not track calculations on tensor members of custom
         # classes. Python uses named tuples to limit what the user can stick in
@@ -120,7 +126,11 @@ class Calculator(torch.nn.Module):
             "cell": system.cell,
         }
 
-        result = torch.ops.rascaline.compute(self.calculator, system_dict, self.options)
+        if options is None:
+            options = {}
+        options["densify_species"] = self.densify_species
+
+        result = torch.ops.rascaline.compute(self.calculator, system_dict, options)
 
         return Descriptor(
             values=result["values"],

@@ -25,7 +25,7 @@ def gradcheck_rascaline(calculator, n_atoms, cell):
         dtype=torch.float64,
     )
 
-    model = rascaline_torch.Calculator(calculator, species)
+    model = rascaline_torch.Calculator(calculator, [0, 1, 2])
 
     def compute(positions, species, cell):
         system = rascaline_torch.System(

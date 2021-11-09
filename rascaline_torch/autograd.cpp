@@ -1,3 +1,5 @@
+#include <unordered_set>
+
 #include "rascaline_torch.hpp"
 
 using namespace rascaline;
@@ -20,6 +22,11 @@ static std::vector<std::string> get_densify_for_calculator(const std::string& na
     }
 }
 
+static std::unordered_set<std::string> KNOWN_OPTIONS = std::unordered_set<std::string>{
+    // densify options
+    "densify_species",
+};
+
 torch::autograd::variable_list RascalineAutograd::forward(
     torch::autograd::AutogradContext *ctx,
     c10::intrusive_ptr<TorchCalculator> calculator,
@@ -31,8 +38,16 @@ torch::autograd::variable_list RascalineAutograd::forward(
     auto system = TensorSystem(species, positions, cell);
     auto rascal_system = system.as_rascal_system_t();
 
+    for (const auto& entry: options_dict) {
+        if (KNOWN_OPTIONS.find(entry.key()) == KNOWN_OPTIONS.end()) {
+            throw RascalError("got unknown option in rascaline calculator: '" + entry.key() + "'");
+        }
+    }
+
     auto options = rascaline::CalculationOptions();
     options.use_native_system = true;
+    // TODO: selected_samples and selected_features & their interaction with
+    // densify
 
     auto descriptor = rascaline::Descriptor();
     auto status = rascal_calculator_compute(
@@ -49,7 +64,27 @@ torch::autograd::variable_list RascalineAutograd::forward(
     auto densify_variables = get_densify_for_calculator(
         calculator->name()
     );
-    auto densified_gradients_indexes = descriptor.densify_values(densify_variables);
+
+    auto requested = rascaline::ArrayView<int32_t>(static_cast<const int32_t*>(nullptr), {0, 0});
+    if (options_dict.contains("densify_species")) {
+        auto densify_species = options_dict.at("densify_species");
+        auto densify_species_sizes = densify_species.sizes();
+        if (densify_species.dtype() != torch::kInt || densify_species_sizes.size() != 2) {
+            throw RascalError("densify_species must be a 2D tensor containing 32-bit integers");
+        }
+
+        if (!densify_species.is_contiguous() || !densify_species.device().is_cpu()) {
+            throw RascalError("densify_species must be stored as a contiguous tensor on CPU");
+        }
+
+        requested = rascaline::ArrayView<int32_t>(
+            densify_species.data_ptr<int32_t>(),
+            {static_cast<size_t>(densify_species_sizes[0]), static_cast<size_t>(densify_species_sizes[1])}
+        );
+    }
+    auto densified_gradients_indexes = descriptor.densify_values(
+        densify_variables, requested
+    );
 
     auto descriptor_holder = c10::make_intrusive<DescriptorHolder>(std::move(descriptor));
     auto values = descriptor_holder->values_as_tensor();
