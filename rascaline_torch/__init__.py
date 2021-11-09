@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import os
 from collections import namedtuple
-from typing import Dict
+from typing import Dict, List, Any, Union, NamedTuple
 
 import torch
+from torch import Tensor
 import numpy as np
 
 import rascaline
@@ -15,9 +18,40 @@ rascaline.clib._get_library()
 
 torch.ops.load_library(os.path.join(_HERE, "_rascaline_torch.so"))
 
+_get_interned_string = torch.ops.rascaline.get_interned_string
 
-System = namedtuple("System", ["species", "positions", "cell"])
-Descriptor = namedtuple("Descriptor", ["values", "samples", "features"])
+
+class IndexesTensor(object):
+    def __init__(self, data: torch.Tensor, names: List[str]):
+        self.data = data
+        self.names = names
+
+    def __repr__(self):
+        return f"IndexesTensor(\n    names={self.names},\n    tensor={self.data}\n)"
+
+    def index(self, name: str):
+        assert torch.jit.isinstance(name, str)
+        return self.data[:, self.names.index(name)]
+
+
+System = NamedTuple(
+    "System",
+    [
+        ("species", torch.Tensor),
+        ("positions", torch.Tensor),
+        ("cell", torch.Tensor),
+    ],
+)
+
+
+Descriptor = NamedTuple(
+    "Descriptor",
+    [
+        ("values", torch.Tensor),
+        ("samples", IndexesTensor),
+        ("features", IndexesTensor),
+    ],
+)
 
 
 def as_torch_system(frame, requires_grad=False):
@@ -90,6 +124,12 @@ class Calculator(torch.nn.Module):
 
         return Descriptor(
             values=result["values"],
-            samples=result["samples"],
-            features=result["features"],
+            samples=IndexesTensor(
+                data=result["samples"],
+                names=[_get_interned_string(i) for i in result["samples_names"]],
+            ),
+            features=IndexesTensor(
+                data=result["features"],
+                names=[_get_interned_string(i) for i in result["features_names"]],
+            ),
         )

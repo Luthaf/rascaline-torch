@@ -23,9 +23,16 @@ torch::Dict<std::string, torch::Tensor> compute(
     auto descriptor = torch::Dict<std::string, torch::Tensor>();
     descriptor.insert("values", std::move(result[0]));
     descriptor.insert("samples", std::move(result[1]));
-    descriptor.insert("features", std::move(result[2]));
+    descriptor.insert("samples_names", std::move(result[2]));
+    descriptor.insert("features", std::move(result[3]));
+    descriptor.insert("features_names", std::move(result[4]));
 
     return descriptor;
+}
+
+
+std::string get_interned_string(int64_t id) {
+    return StringInterner::get(id);
 }
 
 TORCH_LIBRARY(rascaline, m) {
@@ -50,4 +57,5 @@ TORCH_LIBRARY(rascaline, m) {
         ;
 
     m.def("compute", compute);
+    m.def("get_interned_string", get_interned_string);
 }

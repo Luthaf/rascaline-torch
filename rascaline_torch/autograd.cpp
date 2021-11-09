@@ -60,6 +60,7 @@ torch::autograd::variable_list RascalineAutograd::forward(
 
     // TODO: use fixed size integers in rascaline API instead of uintptr_t
     static_assert(sizeof(int64_t) == sizeof(uintptr_t), "this code only works on 32-bit platform");
+
     ctx->saved_data["densified_gradients_indexes"] = torch::from_blob(
         densified_gradients_indexes.data(),
         {static_cast<int64_t>(densified_gradients_indexes.size()), 3},
@@ -78,9 +79,27 @@ torch::autograd::variable_list RascalineAutograd::forward(
         features = features.clone();
     }
 
-    // TODO: sample names & features names
+    // pass sample names & feature names as integer id. The global StringInterner
+    // deals with converting strings to id and id back to strings
+    auto raw_samples = descriptor_holder->data.samples();
+    auto raw_samples_names = raw_samples.names();
+    auto samples_names = torch::zeros({static_cast<int64_t>(raw_samples_names.size())}, torch::kInt64);
+    for (size_t i=0; i<raw_samples_names.size(); i++) {
+        samples_names[i] = static_cast<int64_t>(
+            StringInterner::add(raw_samples_names[i])
+        );
+    }
 
-    return {values, samples, features};
+    auto raw_features = descriptor_holder->data.features();
+    auto raw_features_names = raw_features.names();
+    auto features_names = torch::zeros({static_cast<int64_t>(raw_features_names.size())}, torch::kInt64);
+    for (size_t i=0; i<raw_features_names.size(); i++) {
+        features_names[i] = static_cast<int64_t>(
+            StringInterner::add(raw_features_names[i])
+        );
+    }
+
+    return {values, samples, samples_names, features, features_names};
 }
 
 torch::autograd::variable_list RascalineAutograd::backward(
@@ -94,8 +113,6 @@ torch::autograd::variable_list RascalineAutograd::backward(
     auto grad_cell = torch::Tensor();
 
     if (ctx->saved_data["positions_requires_grad"].toBool()) {
-        // we don't care about gradient w.r.t. samples/features, i.e.
-        // whatever is in grad_outputs[1] and grad_outputs[2]
         const auto& values_grad = grad_outputs[0];
 
         auto densified_gradients_indexes = ctx->saved_data["densified_gradients_indexes"].toTensor();
@@ -158,3 +175,26 @@ torch::autograd::variable_list RascalineAutograd::backward(
 
     return {grad_calculator, grad_options, grad_species, grad_positions, grad_cell};
 }
+
+
+const std::string& StringInterner::get(size_t i) {
+    std::lock_guard<std::mutex> lock(MUTEX_);
+    assert(i < STRINGS_.size());
+    return STRINGS_[i];
+}
+
+size_t StringInterner::add(const std::string& value) {
+    std::lock_guard<std::mutex> lock(MUTEX_);
+
+    for (size_t i=0; i<STRINGS_.size(); i++) {
+        if (STRINGS_[i] == value) {
+            return i;
+        }
+    }
+
+    STRINGS_.push_back(value);
+    return STRINGS_.size() - 1;
+}
+
+std::mutex StringInterner::MUTEX_;
+std::vector<std::string> StringInterner::STRINGS_;

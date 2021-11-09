@@ -3,11 +3,24 @@
 
 #include <string>
 #include <vector>
+#include <mutex>
 
 #include <torch/torch.h>
 #include <rascaline.hpp>
 
 namespace rascaline {
+
+class StringInterner {
+public:
+    /// TODO
+    static const std::string& get(size_t i);
+    /// TODO
+    static size_t add(const std::string& value);
+
+private:
+    static std::mutex MUTEX_;
+    static std::vector<std::string> STRINGS_;
+};
 
 class DescriptorHolder: public torch::CustomClassHolder {
 public:
