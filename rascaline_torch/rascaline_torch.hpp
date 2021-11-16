@@ -10,11 +10,17 @@
 
 namespace rascaline {
 
+/// Basic string interner to pass strings from rascaline to the Python side of
+/// rascaline_torch. Since PyTorch does not support string tensors, we pass
+/// tensor of integers, where each integer correspond to a string stored by this
+/// class.
 class StringInterner {
 public:
-    /// TODO
+    /// Get the string corresponding to a given id
     static const std::string& get(size_t i);
-    /// TODO
+    /// Add a new string in the global store, and get the corresponding integer
+    /// id. If the string is already in the store, the corresponding id is
+    /// returned and no new string is added.
     static size_t add(const std::string& value);
 
 private:
@@ -22,6 +28,8 @@ private:
     static std::vector<std::string> STRINGS_;
 };
 
+/// Custom class holder used to store gradients data inside a
+/// `rascaline::Descriptor` in a `torch::autograd::AutogradContext`.
 class DescriptorHolder: public torch::CustomClassHolder {
 public:
     DescriptorHolder(rascaline::Descriptor descriptor): data(std::move(descriptor)) {}
@@ -37,8 +45,13 @@ public:
 };
 
 
+/// Implementation of `rascaline::System` using torch tensors as backing memory
+/// for all the data
 class TensorSystem: public rascaline::System {
 public:
+    /// Try to construct a `TorchSystem` with the given tensors. This function
+    /// will validate that the tensor have the right shape, dtype, and that they
+    /// live on CPU and are contiguous.
     TensorSystem(torch::Tensor species, torch::Tensor positions, torch::Tensor cell);
 
     virtual ~TensorSystem() {}
@@ -82,6 +95,8 @@ private:
     at::Tensor cell_;
 };
 
+/// Custom class holder to store, serialize and load rascaline calculators
+/// inside Torch(Script) modules.
 class TorchCalculator: public torch::CustomClassHolder {
 public:
     TorchCalculator(std::string name, std::string parameters):
@@ -107,8 +122,27 @@ private:
 };
 
 
+/// Custom torch::autograd::Function integrating rascaline with torch autorgrad.
 class RascalineAutograd: public torch::autograd::Function<RascalineAutograd> {
 public:
+    /// Compute the representation of the system formed with `species`,
+    /// `positions` and `cell` using the given `calculator` and corresponding
+    /// `options`.
+    ///
+    /// The descriptor returned by rascaline will automatically be **densified**
+    /// along `neighbor_species`. `options["densify_species"]` can contain a
+    /// tensor that will be passed to `rascaline::Descriptor::densify` as the
+    /// list of requested features. See the corresponding documentation for more
+    /// information.
+    ///
+    /// @returns {values, samples, samples_names, features, features_names}
+    /// where `values` is a tensor containing the **densified** representation
+    /// returned by the `calculator`; `samples` contains the indexes used to
+    /// describe the samples and `samples_names` contains interned strings id
+    /// (to be used with `StringIndexer::get`) corresponding to the columns of
+    /// `samples`; `features` contains the indexes used to describe the features
+    /// and `features_names` contains interned strings id (to be used with
+    /// `StringIndexer::get`) corresponding to the columns of `features`;
     static torch::autograd::variable_list forward(
         torch::autograd::AutogradContext *ctx,
         c10::intrusive_ptr<TorchCalculator> calculator,

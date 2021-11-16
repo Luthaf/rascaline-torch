@@ -3,6 +3,9 @@
 #include "rascaline_torch.hpp"
 using namespace rascaline;
 
+/// Small wrapper around `RascalineAutograd` with a slightly more ergonomic API
+/// (using named parameters inside of the tensors instead of relying on a
+/// specific order for all the tensors input & outputs).
 torch::Dict<std::string, torch::Tensor> compute(
     c10::intrusive_ptr<TorchCalculator> calculator,
     torch::Dict<std::string, torch::Tensor> system,

@@ -51,7 +51,7 @@ class cmake_ext(build_ext):
         subprocess.run(
             ["cmake", "-S", source_dir, "-B", build_dir, *cmake_options], check=True
         )
-        subprocess.run(["cmake", "--build", build_dir], check=True)
+        subprocess.run(["cmake", "--build", build_dir, "--parallel"], check=True)
         subprocess.run(
             ["cmake", "--build", build_dir, "--target", "install"], check=True
         )
