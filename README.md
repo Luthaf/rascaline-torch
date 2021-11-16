@@ -13,7 +13,7 @@ pip install git+https://github.com/Luthaf/rascaline-torch
 import torch
 import rascaline
 
-from rascaline_torch import RascalineModule
+import rascaline_torch
 
 HYPER_PARAMETERS = {
     "cutoff": 3,
@@ -25,23 +25,24 @@ HYPER_PARAMETERS = {
     "radial_basis": {"Gto": {}},
 }
 
-# wrap a rascaline calculator in a torch.nn.Module
-calculator = rascaline.SphericalExpansion(**HYPER_PARAMETERS)
-calculator = RascalineModule(calculator)
+# wrap a rascaline calculator inside a torch.nn.Module (rascaline_torch.Calculator)
+# you need to specify which neighboring species will be taken into account by
+# the model
+calculator = rascaline_torch.Calculator(
+    rascaline.SphericalExpansion(**HYPER_PARAMETERS),
+    species=[1, 6, 8]
+)
 
 # compute spherical expansion
-n_atoms = ...
-positions = torch.tensor(..., shape=(n_atoms, 3), dtype=torch.float64)
-positions.requires_grad = True
-cell = torch.tensor(..., shape=(3, 3), dtype=torch.float64)
-species = torch.tensor(..., shape=(n_atoms,), dtype=torch.int32)
+frames = ase.io.read(...)
+system = rascaline_torch.as_torch_system(frames[0], requires_grad=True)
 
-# you can usually ignore samples & features metadata here
-spherical_expansion, samples, features = calculator(positions, species, cell)
+# descriptor has three attributes: values, samples and features
+descriptor = calculator(system)
 
 # compute the property of interest with your model of choice
 my_model = ...
-energy = my_model(spherical_expansion)
+energy = my_model(descriptor.values)
 
 # backward propagate to extract forces
 energy.backward()
