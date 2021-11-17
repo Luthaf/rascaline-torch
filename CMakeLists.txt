@@ -55,7 +55,10 @@ if (BUILD_FOR_PYTHON)
 endif(BUILD_FOR_PYTHON)
 
 find_package(Torch 1.9 REQUIRED)
-find_package(rascaline 0.1 REQUIRED)
+
+if (NOT TARGET rascaline)
+    find_package(rascaline 0.1 REQUIRED)
+endif()
 
 set_property(TARGET caffe2::mkl PROPERTY INTERFACE_LINK_LIBRARIES)
 set_property(TARGET caffe2::mkldnn PROPERTY INTERFACE_LINK_LIBRARIES)
