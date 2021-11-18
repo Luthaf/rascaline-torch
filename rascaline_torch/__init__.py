@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import os
+import json
 from collections import namedtuple
 from typing import Dict, List, Any, Union, NamedTuple, Optional
 
 import torch
-from torch import Tensor
 import numpy as np
 
 import rascaline
@@ -86,6 +86,10 @@ class Calculator(torch.nn.Module):
                 "the calculator must be one of rascaline calculator, "
                 f"got a value of type {calculator.__class__}"
             )
+
+        self.register_buffer(
+            "cutoff", torch.tensor(json.loads(calculator.parameters)["cutoff"])
+        )
 
         self.calculator = torch.classes.rascaline.Calculator(
             calculator.c_name, calculator.parameters
