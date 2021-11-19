@@ -62,3 +62,43 @@ TorchSystem::TorchSystem(torch::Tensor species, torch::Tensor positions, torch::
         throw RascalError("we can not track the gradient with respect to the cell yet");
     }
 }
+
+void TorchSystem::compute_neighbors(double cutoff) {
+    if (!this->has_precomputed_pairs()) {
+        throw RascalError("this system only support 'use_native_systems=true'");
+    }
+
+    if (cutoff != this->cutoff_) {
+        throw RascalError("trying to get neighbor list with a different cutoff than the pre-computed neighbor list");
+    }
+}
+
+const std::vector<rascal_pair_t>& TorchSystem::pairs() const {
+    if (!this->has_precomputed_pairs()) {
+        throw RascalError("this system only support 'use_native_systems=true'");
+    }
+    return pairs_;
+}
+
+const std::vector<rascal_pair_t>& TorchSystem::pairs_containing(uintptr_t center) const {
+    if (!this->has_precomputed_pairs()) {
+        throw RascalError("this system only support 'use_native_systems=true'");
+    }
+    return pairs_containing_[center];
+}
+
+void TorchSystem::set_precomputed_pairs(double cutoff, std::vector<rascal_pair_t> pairs) {
+    if (pairs.empty()) {
+        throw RascalError("can not set precomputed pairs to an empty list of pairs");
+    }
+
+    this->cutoff_ = cutoff;
+    this->pairs_ = pairs;
+
+    pairs_containing_.clear();
+    pairs_containing_.resize(this->size());
+    for (const auto& pair: this->pairs_) {
+        pairs_containing_[pair.first].push_back(pair);
+        pairs_containing_[pair.second].push_back(pair);
+    }
+}

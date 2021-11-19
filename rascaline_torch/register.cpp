@@ -11,20 +11,20 @@ torch::Dict<std::string, torch::Tensor> compute(
     c10::intrusive_ptr<TorchSystem> system,
     torch::Dict<std::string, torch::Tensor> options
 ) {
-    auto result = RascalineAutograd::apply(
+    auto outputs = RascalineAutograd::apply(
         calculator,
         options,
-        system->get_species(),
+        system,
         system->get_positions(),
         system->get_cell()
     );
 
     auto descriptor = torch::Dict<std::string, torch::Tensor>();
-    descriptor.insert("values", std::move(result[0]));
-    descriptor.insert("samples", std::move(result[1]));
-    descriptor.insert("samples_names", std::move(result[2]));
-    descriptor.insert("features", std::move(result[3]));
-    descriptor.insert("features_names", std::move(result[4]));
+    descriptor.insert("values", std::move(outputs[0]));
+    descriptor.insert("samples", std::move(outputs[1]));
+    descriptor.insert("samples_names", std::move(outputs[2]));
+    descriptor.insert("features", std::move(outputs[3]));
+    descriptor.insert("features_names", std::move(outputs[4]));
 
     return descriptor;
 }

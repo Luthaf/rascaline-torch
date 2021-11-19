@@ -57,25 +57,31 @@ public:
         torch::Tensor cell
     );
 
+    TorchSystem(const TorchSystem&) = delete;
+    TorchSystem& operator=(const TorchSystem&) = delete;
+
+    TorchSystem(TorchSystem&&) = default;
+    TorchSystem& operator=(TorchSystem&&) = default;
+
     virtual ~TorchSystem() {}
 
     /*========================================================================*/
     /*            Functions to implement rascaline::System                    */
     /*========================================================================*/
 
-    uintptr_t size() const override {
+    uintptr_t size() const override final {
         return species_.sizes()[0];
     }
 
-    const int32_t* species() const override {
+    const int32_t* species() const override final {
         return species_.data_ptr<int32_t>();
     }
 
-    const double* positions() const override {
+    const double* positions() const override final {
         return positions_.data_ptr<double>();
     }
 
-    CellMatrix cell() const override {
+    CellMatrix cell() const override final {
         auto data = cell_.data_ptr<double>();
         return CellMatrix{{
             {{data[0], data[1], data[2]}},
@@ -84,17 +90,26 @@ public:
         }};
     }
 
-    void compute_neighbors(double cutoff) override {
-        throw RascalError("this system only support 'use_native_systems=true'");
+    void compute_neighbors(double cutoff) override final;
+
+    const std::vector<rascal_pair_t>& pairs() const override final;
+
+    const std::vector<rascal_pair_t>& pairs_containing(uintptr_t center) const override final;
+
+    /*========================================================================*/
+    /*                 Functions to re-use pre-computed pairs                 */
+    /*========================================================================*/
+
+    /// Should we copy data to rascaline internal data structure and compute the
+    /// neighbor list there?
+    bool use_native_system() const {
+        return !this->has_precomputed_pairs();
     }
 
-    const std::vector<rascal_pair_t>& pairs() const override {
-        throw RascalError("this system only support 'use_native_systems=true'");
-    }
-
-    const std::vector<rascal_pair_t>& pairs_containing(uintptr_t center) const override {
-        throw RascalError("this system only support 'use_native_systems=true'");
-    }
+    /// set the list of pre-computed pairs to `pairs` (following the convention
+    /// required by `rascaline::System::pairs`), and store the `cutoff` used to
+    /// compute the pairs.
+    void set_precomputed_pairs(double cutoff, std::vector<rascal_pair_t> pairs);
 
     /*========================================================================*/
     /*                 Functions for the Python interface                     */
@@ -118,11 +133,13 @@ private:
     torch::Tensor positions_;
     torch::Tensor cell_;
 
+    bool has_precomputed_pairs() const {
+        return !pairs_.empty();
+    }
 
-    // TODO: pass neighbors list around
-    // torch::Tensor nl_cutoff_;
-    // torch::Tensor nl_pairs_;
-    // torch::Tensor nl_distances_;
+    double cutoff_ = 0.0;
+    std::vector<rascal_pair_t> pairs_;
+    std::vector<std::vector<rascal_pair_t>> pairs_containing_;
 };
 
 /// Custom class holder to store, serialize and load rascaline calculators
@@ -155,9 +172,9 @@ private:
 /// Custom torch::autograd::Function integrating rascaline with torch autorgrad.
 class RascalineAutograd: public torch::autograd::Function<RascalineAutograd> {
 public:
-    /// Compute the representation of the system formed with `species`,
-    /// `positions` and `cell` using the given `calculator` and corresponding
-    /// `options`.
+    /// Compute the representation of the `system` using the `calculator` and
+    /// corresponding `options`. `positions` and `cell` are dummy parameters
+    /// that must be the same as `system->positions()` and `system->cell()`.
     ///
     /// The descriptor returned by rascaline will automatically be **densified**
     /// along `neighbor_species`. `options["densify_species"]` can contain a
@@ -177,7 +194,7 @@ public:
         torch::autograd::AutogradContext *ctx,
         c10::intrusive_ptr<TorchCalculator> calculator,
         torch::Dict<std::string, torch::Tensor> options,
-        torch::Tensor species,
+        c10::intrusive_ptr<TorchSystem> system,
         torch::Tensor positions,
         torch::Tensor cell
     );

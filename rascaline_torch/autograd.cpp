@@ -25,6 +25,8 @@ static std::vector<std::string> get_densify_for_calculator(const std::string& na
 static std::unordered_set<std::string> KNOWN_OPTIONS = std::unordered_set<std::string>{
     // densify options
     "densify_species",
+    // calculator options
+    "use_native_system",
 };
 
 
@@ -49,21 +51,21 @@ torch::autograd::variable_list RascalineAutograd::forward(
     torch::autograd::AutogradContext *ctx,
     c10::intrusive_ptr<TorchCalculator> calculator,
     torch::Dict<std::string, torch::Tensor> options_dict,
-    torch::Tensor species,
+    c10::intrusive_ptr<TorchSystem> system,
+    // we need to take positions & cell as parameters for the registration of
+    // `backward_fn` to work
     torch::Tensor positions,
     torch::Tensor cell
 ) {
-    auto system = TorchSystem(species, positions, cell);
-    auto rascal_system = system.as_rascal_system_t();
-
     for (const auto& entry: options_dict) {
         if (KNOWN_OPTIONS.find(entry.key()) == KNOWN_OPTIONS.end()) {
             throw RascalError("got unknown option in rascaline calculator: '" + entry.key() + "'");
         }
     }
 
+    auto rascal_system = system->as_rascal_system_t();
     auto options = rascaline::CalculationOptions();
-    options.use_native_system = true;
+    options.use_native_system = system->use_native_system();
     // TODO: selected_samples and selected_features & their interaction with
     // densify
 
