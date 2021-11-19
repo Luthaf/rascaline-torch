@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import json
 from collections import namedtuple
-from typing import Dict, List, Any, Union, NamedTuple, Optional
+from typing import Dict, List, Any, Union, NamedTuple, Optional, TYPE_CHECKING
 
 import torch
 import numpy as np
@@ -34,14 +34,32 @@ class IndexesTensor(object):
         return self.data[:, self.names.index(name)]
 
 
-System = NamedTuple(
-    "System",
-    [
-        ("species", torch.Tensor),
-        ("positions", torch.Tensor),
-        ("cell", torch.Tensor),
-    ],
-)
+if TYPE_CHECKING:
+    # define a dummy class with the same interface to make mypy happy
+    class System:
+        def __init__(
+            self,
+            species: torch.Tensor,
+            position: torch.Tensor,
+            cell: torch.Tensor,
+        ):
+            pass
+
+        @property
+        def species(self) -> torch.Tensor:
+            pass
+
+        @property
+        def positions(self) -> torch.Tensor:
+            pass
+
+        @property
+        def cell(self) -> torch.Tensor:
+            pass
+
+
+else:
+    System = torch.classes.rascaline.System
 
 
 Descriptor = NamedTuple(
@@ -58,17 +76,17 @@ def as_torch_system(frame, requires_grad=False):
     system = rascaline.systems.wrap_system(frame)
 
     return System(
-        species=torch.tensor(
+        torch.tensor(
             system.species(),
             requires_grad=False,
             dtype=torch.int,
         ),
-        positions=torch.tensor(
+        torch.tensor(
             system.positions(),
             requires_grad=requires_grad,
             dtype=torch.double,
         ),
-        cell=torch.tensor(
+        torch.tensor(
             system.cell(),
             requires_grad=False,
             dtype=torch.double,
@@ -119,22 +137,11 @@ class Calculator(torch.nn.Module):
         options: Optional[Dict[str, torch.Tensor]] = None,
     ):
         """TODO"""
-        # C++ code uses dictionaries since there are no named tuples there, and
-        # pytorch can not track calculations on tensor members of custom
-        # classes. Python uses named tuples to limit what the user can stick in
-        # the "system"; and for a nicer access API (`system.positions` vs
-        # system["positions"]). So here, we need to convert between the two
-        system_dict = {
-            "species": system.species,
-            "positions": system.positions,
-            "cell": system.cell,
-        }
-
         if options is None:
             options = {}
         options["densify_species"] = self.densify_species
 
-        result = torch.ops.rascaline.compute(self.calculator, system_dict, options)
+        result = torch.ops.rascaline.compute(self.calculator, system, options)
 
         return Descriptor(
             values=result["values"],

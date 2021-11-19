@@ -8,19 +8,15 @@ using namespace rascaline;
 /// specific order for all the tensors input & outputs).
 torch::Dict<std::string, torch::Tensor> compute(
     c10::intrusive_ptr<TorchCalculator> calculator,
-    torch::Dict<std::string, torch::Tensor> system,
+    c10::intrusive_ptr<TorchSystem> system,
     torch::Dict<std::string, torch::Tensor> options
 ) {
-    auto species = system.at("species");
-    auto positions = system.at("positions");
-    auto cell = system.at("cell");
-
     auto result = RascalineAutograd::apply(
         calculator,
         options,
-        species,
-        positions,
-        cell
+        system->get_species(),
+        system->get_positions(),
+        system->get_cell()
     );
 
     auto descriptor = torch::Dict<std::string, torch::Tensor>();
@@ -42,6 +38,16 @@ TORCH_LIBRARY(rascaline, m) {
     // only register this class to be able to create c10::intrusive_ptr with it
     // and store it in the custom autograd functions
     m.class_<DescriptorHolder>("__DescriptorHolder");
+
+    m.class_<TorchSystem>("System")
+        .def(torch::init<torch::Tensor, torch::Tensor, torch::Tensor>(),
+            "", /* TODO: docstrings */
+            {torch::arg("species"), torch::arg("positions"), torch::arg("cell")}
+        )
+        .def_property("species", &TorchSystem::get_species)
+        .def_property("positions", &TorchSystem::get_positions)
+        .def_property("cell", &TorchSystem::get_cell)
+        ;
 
 
     m.class_<TorchCalculator>("Calculator")

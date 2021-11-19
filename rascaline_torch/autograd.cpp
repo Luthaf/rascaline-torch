@@ -53,7 +53,7 @@ torch::autograd::variable_list RascalineAutograd::forward(
     torch::Tensor positions,
     torch::Tensor cell
 ) {
-    auto system = TensorSystem(species, positions, cell);
+    auto system = TorchSystem(species, positions, cell);
     auto rascal_system = system.as_rascal_system_t();
 
     for (const auto& entry: options_dict) {

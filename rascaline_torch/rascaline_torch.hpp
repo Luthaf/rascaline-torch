@@ -44,17 +44,24 @@ public:
     rascaline::Descriptor data;
 };
 
-
 /// Implementation of `rascaline::System` using torch tensors as backing memory
-/// for all the data
-class TensorSystem: public rascaline::System {
+/// for all the data.
+class TorchSystem: public rascaline::System, public torch::CustomClassHolder {
 public:
     /// Try to construct a `TorchSystem` with the given tensors. This function
     /// will validate that the tensor have the right shape, dtype, and that they
     /// live on CPU and are contiguous.
-    TensorSystem(torch::Tensor species, torch::Tensor positions, torch::Tensor cell);
+    TorchSystem(
+        torch::Tensor species,
+        torch::Tensor positions,
+        torch::Tensor cell
+    );
 
-    virtual ~TensorSystem() {}
+    virtual ~TorchSystem() {}
+
+    /*========================================================================*/
+    /*            Functions to implement rascaline::System                    */
+    /*========================================================================*/
 
     uintptr_t size() const override {
         return species_.sizes()[0];
@@ -89,10 +96,33 @@ public:
         throw RascalError("this system only support 'use_native_systems=true'");
     }
 
+    /*========================================================================*/
+    /*                 Functions for the Python interface                     */
+    /*========================================================================*/
+
+    torch::Tensor get_species() {
+        return species_;
+    }
+
+    torch::Tensor get_positions() {
+        return positions_;
+    }
+
+    torch::Tensor get_cell() {
+        return cell_;
+    }
+
+
 private:
-    at::Tensor species_;
-    at::Tensor positions_;
-    at::Tensor cell_;
+    torch::Tensor species_;
+    torch::Tensor positions_;
+    torch::Tensor cell_;
+
+
+    // TODO: pass neighbors list around
+    // torch::Tensor nl_cutoff_;
+    // torch::Tensor nl_pairs_;
+    // torch::Tensor nl_distances_;
 };
 
 /// Custom class holder to store, serialize and load rascaline calculators

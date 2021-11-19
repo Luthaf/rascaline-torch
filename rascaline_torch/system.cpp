@@ -2,7 +2,7 @@
 
 using namespace rascaline;
 
-TensorSystem::TensorSystem(torch::Tensor species, torch::Tensor positions, torch::Tensor cell) {
+TorchSystem::TorchSystem(torch::Tensor species, torch::Tensor positions, torch::Tensor cell) {
     auto species_sizes = species.sizes();
     if (species_sizes.size() != 1) {
         throw RascalError("atomic species tensor must be a 1D tensor");
