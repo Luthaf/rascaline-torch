@@ -64,6 +64,7 @@ public:
         c10::intrusive_ptr<rascaline::DescriptorHolder> descriptor,
         torch::Tensor densified_gradients_indexes,
         torch::Tensor selected_centers,
+        int n_feature_blocks,
         // actual function input
         torch::Tensor values_grad,
         // along for the ride so that torch is able to include them in the graph
@@ -136,6 +137,7 @@ torch::autograd::variable_list RascalineAutograd::forward(
     );
 
     auto requested = rascaline::ArrayView<int32_t>(static_cast<const int32_t*>(nullptr), {0, 0});
+    auto n_feature_blocks = 1;
     if (options_dict.contains("densify_species")) {
         auto densify_species = options_dict.at("densify_species");
         auto densify_species_sizes = densify_species.sizes();
@@ -151,6 +153,8 @@ torch::autograd::variable_list RascalineAutograd::forward(
             densify_species.data_ptr<int32_t>(),
             {static_cast<size_t>(densify_species_sizes[0]), static_cast<size_t>(densify_species_sizes[1])}
         );
+
+        n_feature_blocks = densify_species_sizes[0];
     }
     auto densified_gradients_indexes = descriptor.densify_values(
         densify_variables, requested
@@ -162,6 +166,7 @@ torch::autograd::variable_list RascalineAutograd::forward(
     auto features = descriptor_holder->features_as_tensor();
 
     ctx->saved_data["descriptor"] = descriptor_holder;
+    ctx->saved_data["n_feature_blocks"] = n_feature_blocks;
 
     // TODO: use fixed size integers in rascaline API instead of uintptr_t
     static_assert(sizeof(int64_t) == sizeof(uintptr_t), "this code only works on 32-bit platform");
@@ -236,6 +241,7 @@ torch::autograd::variable_list RascalineAutograd::backward(
             ctx->saved_data["descriptor"].toCustomClass<DescriptorHolder>(),
             ctx->saved_data["densified_gradients_indexes"].toTensor(),
             selected_centers,
+            ctx->saved_data["n_feature_blocks"].toInt(),
             values_grad,
             positions,
             cell
@@ -254,6 +260,7 @@ torch::autograd::variable_list RascalinePositionsGrad::forward(
     c10::intrusive_ptr<rascaline::DescriptorHolder> descriptor,
     torch::Tensor densified_gradients_indexes,
     torch::Tensor selected_centers,
+    int n_feature_blocks,
     torch::Tensor values_grad,
     torch::Tensor positions,
     torch::Tensor cell
@@ -261,10 +268,6 @@ torch::autograd::variable_list RascalinePositionsGrad::forward(
     if (densified_gradients_indexes.sizes()[0] == 0) {
         throw RascalError("missing gradients in call to backward. Did you set the correct hyper-parameters?");
     }
-
-    auto n_features_blocks = torch::max(
-        densified_gradients_indexes.index({torch::indexing::Slice(), 2})
-    ).item<int64_t>() + 1;
 
     const auto& gradients_samples = descriptor->data.gradients_samples();
     auto gradients = descriptor->gradients_as_tensor();
@@ -274,7 +277,7 @@ torch::autograd::variable_list RascalinePositionsGrad::forward(
     auto n_samples = gradients_samples.shape()[0];
     auto grad_feature_size = gradients.sizes()[1];
     assert(gradients.sizes()[0] == n_samples);
-    if (grad_feature_size != n_features / n_features_blocks) {
+    if (grad_feature_size != n_features / n_feature_blocks) {
         if (grad_feature_size == 0) {
             throw RascalError("missing gradients in call to backward. Did you set the correct hyper-parameters?");
         } else {
@@ -395,6 +398,7 @@ torch::autograd::variable_list RascalinePositionsGrad::backward(
     }
 
     return {
+        torch::Tensor(),
         torch::Tensor(),
         torch::Tensor(),
         torch::Tensor(),
