@@ -64,11 +64,11 @@ set_property(TARGET caffe2::mkl PROPERTY INTERFACE_LINK_LIBRARIES)
 set_property(TARGET caffe2::mkldnn PROPERTY INTERFACE_LINK_LIBRARIES)
 
 add_library(rascaline_torch SHARED
-    rascaline_torch/interner.cpp
-    rascaline_torch/system.cpp
-    rascaline_torch/autograd.cpp
-    rascaline_torch/descriptor.cpp
-    rascaline_torch/register.cpp
+    rascaline_torch/src/interner.cpp
+    rascaline_torch/src/system.cpp
+    rascaline_torch/src/autograd.cpp
+    rascaline_torch/src/descriptor.cpp
+    rascaline_torch/src/register.cpp
 )
 
 target_link_libraries(rascaline_torch torch rascaline)
