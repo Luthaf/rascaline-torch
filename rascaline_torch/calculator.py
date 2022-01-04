@@ -78,7 +78,7 @@ class Calculator(torch.nn.Module):
             raise ValueError("species must be provided as an array of integers")
 
         species = np.unique(np.array(species, dtype=np.int32))
-        if calculator.c_name == "spherical_expansion":
+        if calculator.c_name in ["spherical_expansion", "spherical_expansion_by_pair"]:
             all_species = [[s] for s in species]
         elif calculator.c_name == "soap_power_spectrum":
             all_species = []

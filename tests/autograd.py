@@ -63,6 +63,33 @@ class TestFiniteDifferences(unittest.TestCase):
             )
         )
 
+    def test_spherical_expansion_by_pair(self):
+        species, positions, cell = self._create_random_system(n_atoms=75, cell_size=5.0)
+        positions.requires_grad = True
+
+        model = rascaline_torch.Calculator(
+            rascaline.SphericalExpansionByPair(**HYPERS),
+            species=[0, 1, 2],
+        )
+
+        def compute(positions, species, cell):
+            system = rascaline_torch.System(
+                positions=positions,
+                species=species,
+                cell=cell,
+            )
+            return model(system).values
+
+        self.assertTrue(
+            torch.autograd.gradcheck(
+                compute,
+                (positions, species, cell),
+                eps=1e-12,
+                atol=1e-2,
+                fast_mode=True,
+            )
+        )
+
     def test_power_spectrum(self):
         species, positions, cell = self._create_random_system(n_atoms=75, cell_size=5.0)
         positions.requires_grad = True

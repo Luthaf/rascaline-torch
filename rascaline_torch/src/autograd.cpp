@@ -15,6 +15,8 @@ static size_t find_position(const std::vector<std::string>& names, const char* n
 static std::vector<std::string> get_densify_for_calculator(const std::string& name) {
     if (name == "spherical_expansion") {
         return {"species_neighbor"};
+    } else if (name == "spherical_expansion_by_pair") {
+        return {"species_second"};
     } else if (name == "soap_power_spectrum") {
         return {"species_neighbor_1", "species_neighbor_2"};
     } else {
