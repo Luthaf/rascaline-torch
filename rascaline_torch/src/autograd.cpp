@@ -22,30 +22,6 @@ static std::vector<std::string> get_densify_for_calculator(const std::string& na
     }
 }
 
-static std::unordered_map<int32_t, int32_t> selected_centers_map(
-    const torch::Tensor& selected_centers,
-    const rascaline::Indexes& samples,
-    size_t n_atoms,
-    size_t center_var_i
-) {
-    auto map = std::unordered_map<int32_t, int32_t>();
-    if (selected_centers.sizes().empty()) {
-        for (int32_t i=0; i<n_atoms; i++) {
-            map.emplace(i, i);
-        }
-    } else {
-        for (size_t i=0; i<selected_centers.sizes()[0]; i++) {
-            auto center = selected_centers[i].item<int64_t>();
-            for (size_t sample_i=0; sample_i<samples.shape()[0]; sample_i++) {
-                if (samples(i, center_var_i) == center) {
-                    map.emplace(center, sample_i);
-                }
-            }
-        }
-    }
-    return map;
-}
-
 static std::unordered_set<std::string> KNOWN_OPTIONS = std::unordered_set<std::string>{
     // densify options
     "densify_species",
@@ -62,7 +38,6 @@ public:
         torch::autograd::AutogradContext *ctx,
         // metadata
         c10::intrusive_ptr<rascaline::DescriptorHolder> descriptor,
-        torch::Tensor densified_gradients_indexes,
         torch::Tensor selected_centers,
         int n_feature_blocks,
         // actual function input
@@ -120,10 +95,10 @@ torch::autograd::variable_list RascalineAutograd::forward(
         ctx->saved_data["selected_centers"] = selected_centers;
     }
 
-    auto descriptor = rascaline::Descriptor();
+    auto raw_descriptor = rascaline::Descriptor();
     auto status = rascal_calculator_compute(
         calculator->as_rascal_calculator_t(),
-        descriptor.as_rascal_descriptor_t(),
+        raw_descriptor.as_rascal_descriptor_t(),
         &rascal_system,
         1,
         options.as_rascal_calculation_options_t()
@@ -132,6 +107,10 @@ torch::autograd::variable_list RascalineAutograd::forward(
         throw RascalError(rascal_last_error());
     }
 
+    auto descriptor = c10::make_intrusive<DescriptorHolder>(std::move(raw_descriptor));
+
+    /**************************************************************************/
+    // densify the descriptor along the default variable for this calculator
     auto densify_variables = get_densify_for_calculator(
         calculator->name()
     );
@@ -156,26 +135,17 @@ torch::autograd::variable_list RascalineAutograd::forward(
 
         n_feature_blocks = densify_species_sizes[0];
     }
-    auto densified_gradients_indexes = descriptor.densify_values(
-        densify_variables, requested
-    );
 
-    auto descriptor_holder = c10::make_intrusive<DescriptorHolder>(std::move(descriptor));
-    auto values = descriptor_holder->values_as_tensor();
-    auto samples = descriptor_holder->samples_as_tensor();
-    auto features = descriptor_holder->features_as_tensor();
+    descriptor->densify_values(densify_variables, requested);
 
-    ctx->saved_data["descriptor"] = descriptor_holder;
+    /**************************************************************************/
+
+    auto values = descriptor->values_as_tensor();
+    auto samples = descriptor->samples_as_tensor();
+    auto features = descriptor->features_as_tensor();
+
+    ctx->saved_data["descriptor"] = descriptor;
     ctx->saved_data["n_feature_blocks"] = n_feature_blocks;
-
-    // TODO: use fixed size integers in rascaline API instead of uintptr_t
-    static_assert(sizeof(int64_t) == sizeof(uintptr_t), "this code only works on 32-bit platform");
-
-    ctx->saved_data["densified_gradients_indexes"] = torch::from_blob(
-        densified_gradients_indexes.data(),
-        {static_cast<int64_t>(densified_gradients_indexes.size()), 3},
-        torch::TensorOptions().dtype(torch::kInt64)
-    ).clone(); // we need to copy since densified_gradients_indexes will be freed
 
     ctx->save_for_backward({positions, cell});
 
@@ -190,7 +160,7 @@ torch::autograd::variable_list RascalineAutograd::forward(
 
     // pass sample names & feature names as integer id. The global StringInterner
     // deals with converting strings to id and id back to strings
-    auto raw_samples = descriptor_holder->data.samples();
+    auto raw_samples = descriptor->raw_samples();
     auto raw_samples_names = raw_samples.names();
     auto samples_names = torch::zeros({static_cast<int64_t>(raw_samples_names.size())}, torch::kInt64);
     for (size_t i=0; i<raw_samples_names.size(); i++) {
@@ -199,7 +169,7 @@ torch::autograd::variable_list RascalineAutograd::forward(
         );
     }
 
-    auto raw_features = descriptor_holder->data.features();
+    auto raw_features = descriptor->raw_features();
     auto raw_features_names = raw_features.names();
     auto features_names = torch::zeros({static_cast<int64_t>(raw_features_names.size())}, torch::kInt64);
     for (size_t i=0; i<raw_features_names.size(); i++) {
@@ -239,7 +209,6 @@ torch::autograd::variable_list RascalineAutograd::backward(
         // forces) w.r.t. other parameters in the model.
         grad_positions = RascalinePositionsGrad::apply(
             ctx->saved_data["descriptor"].toCustomClass<DescriptorHolder>(),
-            ctx->saved_data["densified_gradients_indexes"].toTensor(),
             selected_centers,
             ctx->saved_data["n_feature_blocks"].toInt(),
             values_grad,
@@ -258,18 +227,18 @@ torch::autograd::variable_list RascalineAutograd::backward(
 torch::autograd::variable_list RascalinePositionsGrad::forward(
     torch::autograd::AutogradContext *ctx,
     c10::intrusive_ptr<rascaline::DescriptorHolder> descriptor,
-    torch::Tensor densified_gradients_indexes,
     torch::Tensor selected_centers,
     int n_feature_blocks,
     torch::Tensor values_grad,
     torch::Tensor positions,
     torch::Tensor cell
 ) {
-    if (densified_gradients_indexes.sizes()[0] == 0) {
+    const auto& densified_positions = descriptor->densified_positions();
+    if (densified_positions.size() == 0) {
         throw RascalError("missing gradients in call to backward. Did you set the correct hyper-parameters?");
     }
 
-    const auto& gradients_samples = descriptor->data.gradients_samples();
+    const auto& gradients_samples = descriptor->raw_gradients_samples();
     auto gradients = descriptor->gradients_as_tensor();
 
     auto n_atoms = positions.sizes()[0];
@@ -285,45 +254,40 @@ torch::autograd::variable_list RascalinePositionsGrad::forward(
         }
     }
 
-    const auto& names = gradients_samples.names();
-    // TODO: this will only work for per-atom representation
-    auto center_var_i = find_position(names, "center");
-    auto neighbor_var_i = find_position(names, "neighbor");
-    auto spatial_var_i = find_position(names, "spatial");
-
-    const auto& samples = descriptor->data.samples();
-    assert(center_var_i == find_position(samples.names(), "center"));
-
-    // map from the center id to the position in values_grad
-    auto center_to_sample = selected_centers_map(
-        selected_centers, samples, n_atoms, center_var_i
-    );
+    const auto& gradients_samples_names = gradients_samples.names();
+    assert(gradients_samples_names[0] == "sample");
+    assert(gradients_samples_names[1] == "atom");
+    assert(gradients_samples_names[2] == "spatial");
 
     auto grad_positions = torch::zeros_like(positions);
     auto grad_positions_accessor = grad_positions.accessor<double, 2>();
 
-    // compute the Vector-Jacobian product, dealing with densified species
-    for (int64_t i=0; i<densified_gradients_indexes.sizes()[0]; i++) {
-        auto old_sample = densified_gradients_indexes.index({i, 0}).item<int64_t>();
-        auto feature_block = densified_gradients_indexes.index({i, 2}).item<int64_t>();
+    // compute the Vector-Jacobian product, dealing with the sparse species storage
+    for (int64_t grad_sample_i=0; grad_sample_i<gradients_samples.shape()[0]; grad_sample_i++) {
+        auto sample_i = gradients_samples(grad_sample_i, 0);
+        auto atom_i = gradients_samples(grad_sample_i, 1);
+        auto spatial_i = gradients_samples(grad_sample_i, 2);
 
-        auto start = grad_feature_size * feature_block;
-        auto stop = grad_feature_size * (feature_block + 1);
+        auto& position = densified_positions[sample_i];
+        if (!position.used) {
+            continue;
+        }
 
-        auto center_i = gradients_samples(old_sample, center_var_i);
-        auto neighbor_i = gradients_samples(old_sample, neighbor_var_i);
-        auto spatial_i = gradients_samples(old_sample, spatial_var_i);
-
-        auto feature_row = values_grad.index({center_to_sample[center_i], torch::indexing::Slice(start, stop)});
-        auto gradient_row = gradients.index({old_sample, torch::indexing::Slice()});
+        auto start = grad_feature_size * position.feature_block;
+        auto stop = grad_feature_size * (position.feature_block + 1);
+        auto feature_row = values_grad.index({
+            static_cast<int64_t>(position.new_sample), torch::indexing::Slice(start, stop)
+        });
+        auto gradient_row = gradients.index({
+            grad_sample_i, torch::indexing::Slice()
+        });
 
         auto dot = feature_row.dot(gradient_row);
-        grad_positions_accessor[neighbor_i][spatial_i] += dot.item<double>();
+        grad_positions_accessor[atom_i][spatial_i] += dot.item<double>();
     }
 
     ctx->save_for_backward({values_grad, positions, cell});
     ctx->saved_data["descriptor"] = descriptor;
-    ctx->saved_data["densified_gradients_indexes"] = densified_gradients_indexes;
     ctx->saved_data["selected_centers"] = selected_centers;
 
     return {grad_positions};
@@ -336,8 +300,6 @@ torch::autograd::variable_list RascalinePositionsGrad::backward(
     auto grad_output = grad_outputs[0];
 
     // initialize output as empty tensors (corresponding to None in Python)
-    auto grad_grad_positions = torch::Tensor();
-    auto grad_grad_cell = torch::Tensor();
     auto grad_grad_values = torch::Tensor();
 
     auto saved_variables = ctx->get_saved_variables();
@@ -345,46 +307,41 @@ torch::autograd::variable_list RascalinePositionsGrad::backward(
     auto positions = saved_variables[1];
     auto cell = saved_variables[2];
 
-    auto densified_gradients_indexes = ctx->saved_data["densified_gradients_indexes"].toTensor();
     auto selected_centers = ctx->saved_data["selected_centers"].toTensor();
     auto descriptor = ctx->saved_data["descriptor"].toCustomClass<DescriptorHolder>();
+    auto& densified_positions = descriptor->densified_positions();
 
-    const auto& gradients_samples = descriptor->data.gradients_samples();
+    const auto& gradients_samples = descriptor->raw_gradients_samples();
     auto gradients = descriptor->gradients_as_tensor();
     auto grad_feature_size = gradients.sizes()[1];
 
-    const auto& names = gradients_samples.names();
-    // TODO: this will only work for per-atom representation
-    auto center_var_i = find_position(names, "center");
-    auto neighbor_var_i = find_position(names, "neighbor");
-    auto spatial_var_i = find_position(names, "spatial");
-
-    const auto& samples = descriptor->data.samples();
-    assert(center_var_i == find_position(samples.names(), "center"));
-
-    auto center_to_sample = selected_centers_map(
-        selected_centers, samples, positions.sizes()[0], center_var_i
-    );
+    const auto& gradients_samples_names = gradients_samples.names();
+    assert(gradients_samples_names[0] == "sample");
+    assert(gradients_samples_names[1] == "atom");
+    assert(gradients_samples_names[2] == "spatial");
 
     if (values_grad.requires_grad()) {
         grad_grad_values = torch::zeros_like(values_grad);
 
-        // compute the Vector-Jacobian product, densified species as we go
-        for (int64_t i=0; i<densified_gradients_indexes.sizes()[0]; i++) {
-            auto old_sample = densified_gradients_indexes.index({i, 0}).item<int64_t>();
-            auto feature_block = densified_gradients_indexes.index({i, 2}).item<int64_t>();
+        // compute the Vector-Jacobian product, dealing with the sparse species storage
+        for (int64_t grad_sample_i=0; grad_sample_i<gradients_samples.shape()[0]; grad_sample_i++) {
+            auto sample_i = gradients_samples(grad_sample_i, 0);
+            auto atom_i = gradients_samples(grad_sample_i, 1);
+            auto spatial_i = gradients_samples(grad_sample_i, 2);
 
-            auto start = grad_feature_size * feature_block;
-            auto stop = grad_feature_size * (feature_block + 1);
+            auto& position = densified_positions[sample_i];
+            if (!position.used) {
+                continue;
+            }
 
-            auto center_i = gradients_samples(old_sample, center_var_i);
-            auto neighbor_i = gradients_samples(old_sample, neighbor_var_i);
-            auto spatial_i = gradients_samples(old_sample, spatial_var_i);
+            auto start = grad_feature_size * position.feature_block;
+            auto stop = grad_feature_size * (position.feature_block + 1);
 
-            auto gradient_row = gradients.index({old_sample, torch::indexing::Slice()});
-
-            auto slice = grad_grad_values.index({center_to_sample[center_i], torch::indexing::Slice(start, stop)});
-            slice += grad_output.index({neighbor_i, spatial_i}) * gradient_row;
+            auto gradient_row = gradients.index({grad_sample_i, torch::indexing::Slice()});
+            auto slice = grad_grad_values.index({
+                static_cast<int64_t>(position.new_sample), torch::indexing::Slice(start, stop)
+            });
+            slice += grad_output.index({atom_i, spatial_i}) * gradient_row;
         }
     }
 
@@ -398,7 +355,6 @@ torch::autograd::variable_list RascalinePositionsGrad::backward(
     }
 
     return {
-        torch::Tensor(),
         torch::Tensor(),
         torch::Tensor(),
         torch::Tensor(),

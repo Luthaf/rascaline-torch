@@ -32,16 +32,39 @@ private:
 /// `rascaline::Descriptor` in a `torch::autograd::AutogradContext`.
 class DescriptorHolder: public torch::CustomClassHolder {
 public:
-    DescriptorHolder(rascaline::Descriptor descriptor): data(std::move(descriptor)) {}
+    DescriptorHolder(rascaline::Descriptor descriptor):
+        data_(std::move(descriptor)), densified_positions_(nullptr, 0) {}
 
-    at::Tensor values_as_tensor();
-    at::Tensor samples_as_tensor();
-    at::Tensor features_as_tensor();
+    torch::Tensor values_as_tensor();
+    torch::Tensor samples_as_tensor();
+    torch::Tensor features_as_tensor();
+    torch::Tensor gradients_as_tensor();
 
-    at::Tensor gradients_as_tensor();
+    rascaline::Indexes raw_samples() const {
+        return data_.samples();
+    }
 
-    // hold the descriptor memory around
-    rascaline::Descriptor data;
+    rascaline::Indexes raw_features() const {
+        return data_.features();
+    }
+
+    rascaline::Indexes raw_gradients_samples() const {
+        return data_.gradients_samples();
+    }
+
+    void densify_values(std::vector<std::string> variables, const rascaline::ArrayView<int32_t>& requested) {
+        densified_positions_ = data_.densify_values(std::move(variables), requested);
+    }
+
+    const rascaline::MallocArray<rascal_densified_position_t>& densified_positions() const {
+        return densified_positions_;
+    }
+
+private:
+    // keep the descriptor around
+    rascaline::Descriptor data_;
+
+    rascaline::MallocArray<rascal_densified_position_t> densified_positions_;
 };
 
 /// Implementation of `rascaline::System` using torch tensors as backing memory

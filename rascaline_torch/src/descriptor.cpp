@@ -36,17 +36,17 @@ torch::Tensor array_to_tensor(const rascaline::ArrayView<T>& array) {
 
 
 at::Tensor DescriptorHolder::values_as_tensor() {
-    return array_to_tensor(this->data.values());
+    return array_to_tensor(data_.values());
 }
 
 at::Tensor DescriptorHolder::samples_as_tensor() {
-    return array_to_tensor(this->data.samples());
+    return array_to_tensor(data_.samples());
 }
 
 at::Tensor DescriptorHolder::features_as_tensor() {
-    return array_to_tensor(this->data.features());
+    return array_to_tensor(data_.features());
 }
 
 at::Tensor DescriptorHolder::gradients_as_tensor() {
-    return array_to_tensor(this->data.gradients());
+    return array_to_tensor(data_.gradients());
 }
