@@ -3,3 +3,5 @@ dist/
 build/
 *.egg-info
 virtualenv/
+
+rascaline_torch/_rascaline_torch.so

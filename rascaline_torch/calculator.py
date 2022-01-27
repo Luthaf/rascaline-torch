@@ -1,8 +1,9 @@
-import json
 from typing import Dict, List, NamedTuple, Optional
 
 import torch
 import numpy as np
+
+import rascaline
 from rascaline.calculators import CalculatorBase
 
 from .system import System
@@ -66,12 +67,9 @@ class Calculator(torch.nn.Module):
                 f"got a value of type {calculator.__class__}"
             )
 
-        self.register_buffer(
-            "cutoff", torch.tensor(json.loads(calculator.parameters)["cutoff"])
-        )
-
+        self._rascaline_parameters = calculator.parameters
         self.calculator = torch.classes.rascaline.Calculator(
-            calculator.c_name, calculator.parameters
+            calculator.c_name, self._rascaline_parameters
         )
 
         if not np.can_cast(np.asarray(species), np.int32, casting="same_kind"):
