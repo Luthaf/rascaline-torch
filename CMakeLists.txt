@@ -72,7 +72,7 @@ add_library(rascaline_torch SHARED
 )
 
 target_link_libraries(rascaline_torch torch rascaline)
-target_include_directories(rascaline_torch PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/rascaline_torch)
+target_include_directories(rascaline_torch PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/rascaline_torch/src)
 
 install(TARGETS rascaline_torch
     LIBRARY DESTINATION "lib"
