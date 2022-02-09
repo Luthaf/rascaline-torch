@@ -1,5 +1,4 @@
 import unittest
-import copy
 
 import torch
 import rascaline
@@ -32,7 +31,8 @@ class TestErrors(unittest.TestCase):
 
         self.assertEqual(
             str(cm.exception),
-            "the calculator must be one of rascaline calculator, got a value of type <class 'int'>",
+            "the calculator must be one of rascaline calculator, "
+            "got a value of type <class 'int'>",
         )
 
         with self.assertRaises(ValueError) as cm:
@@ -226,3 +226,7 @@ class TestErrors(unittest.TestCase):
             str(cm.exception),
             "we can not track the gradient with respect to the cell yet",
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -23,7 +23,6 @@ if TYPE_CHECKING:
         def cell(self) -> Tensor:
             pass
 
-
 else:
     System = torch.classes.rascaline.System
 

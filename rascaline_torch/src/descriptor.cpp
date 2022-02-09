@@ -22,16 +22,16 @@ torch::Tensor array_to_tensor(const rascaline::ArrayView<T>& array) {
         static_cast<int64_t>(array.shape()[1]),
     };
 
-    auto tensor = torch::from_blob(
+    auto options = torch::TensorOptions().dtype(torch_dtype<T>());
+
+    if (shape[0] * shape[1] == 0) {
+        return torch::empty(shape, options);
+    } else {
         // cast away the const in Indexes array since pytorch can not deal with
         // const tensor.
         // TODO: remove the const at rascaline level
-        const_cast<T*>(array.data()),
-        shape,
-        torch::TensorOptions().dtype(torch_dtype<T>())
-    );
-
-    return tensor;
+        return torch::from_blob(const_cast<T*>(array.data()), shape, options);
+    }
 }
 
 

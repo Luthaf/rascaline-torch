@@ -1,5 +1,4 @@
 import os
-import copy
 import tempfile
 import unittest
 
@@ -60,3 +59,27 @@ class TestCalculator(unittest.TestCase):
 
         self.assertEqual(descriptor_1_6.values.shape, (2, 588))
         self.assertEqual(descriptor_1.values.shape, (2, 294))
+
+    def test_selected_centers(self):
+        model = Calculator(rascaline.SphericalExpansion(**HYPERS), [1, 6])
+
+        full = model(self.system)
+
+        result = model(
+            self.system,
+            {"selected_centers": torch.tensor([1], dtype=torch.int64)},
+        )
+        self.assertEqual(result.values.shape, (1, 588))
+        self.assertTrue(torch.all(result.values == full.values[1]))
+
+        # empty set of selected centers
+        result = model(
+            self.system,
+            {"selected_centers": torch.tensor([], dtype=torch.int64)},
+        )
+
+        self.assertEqual(result.values.shape, (0, 588))
+
+
+if __name__ == "__main__":
+    unittest.main()

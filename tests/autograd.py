@@ -126,3 +126,7 @@ class TestFiniteDifferences(unittest.TestCase):
                 fast_mode=True,
             )
         )
+
+
+if __name__ == "__main__":
+    unittest.main()
