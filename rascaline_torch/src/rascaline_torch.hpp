@@ -126,7 +126,7 @@ public:
     /// Should we copy data to rascaline internal data structure and compute the
     /// neighbor list there?
     bool use_native_system() const {
-        return !this->has_precomputed_pairs();
+        return !this->has_precomputed_pairs_;
     }
 
     /// set the list of pre-computed pairs to `pairs` (following the convention
@@ -156,13 +156,10 @@ private:
     torch::Tensor positions_;
     torch::Tensor cell_;
 
-    bool has_precomputed_pairs() const {
-        return !pairs_.empty();
-    }
-
     double cutoff_ = 0.0;
     std::vector<rascal_pair_t> pairs_;
     std::vector<std::vector<rascal_pair_t>> pairs_containing_;
+    bool has_precomputed_pairs_ = false;
 };
 
 /// Custom class holder to store, serialize and load rascaline calculators

@@ -64,7 +64,7 @@ TorchSystem::TorchSystem(torch::Tensor species, torch::Tensor positions, torch::
 }
 
 void TorchSystem::compute_neighbors(double cutoff) {
-    if (!this->has_precomputed_pairs()) {
+    if (!this->has_precomputed_pairs_) {
         throw RascalError("this system only support 'use_native_systems=true'");
     }
 
@@ -74,24 +74,21 @@ void TorchSystem::compute_neighbors(double cutoff) {
 }
 
 const std::vector<rascal_pair_t>& TorchSystem::pairs() const {
-    if (!this->has_precomputed_pairs()) {
+    if (!this->has_precomputed_pairs_) {
         throw RascalError("this system only support 'use_native_systems=true'");
     }
     return pairs_;
 }
 
 const std::vector<rascal_pair_t>& TorchSystem::pairs_containing(uintptr_t center) const {
-    if (!this->has_precomputed_pairs()) {
+    if (!this->has_precomputed_pairs_) {
         throw RascalError("this system only support 'use_native_systems=true'");
     }
     return pairs_containing_[center];
 }
 
 void TorchSystem::set_precomputed_pairs(double cutoff, std::vector<rascal_pair_t> pairs) {
-    if (pairs.empty()) {
-        throw RascalError("can not set precomputed pairs to an empty list of pairs");
-    }
-
+    this->has_precomputed_pairs_ = true;
     this->cutoff_ = cutoff;
     this->pairs_ = pairs;
 

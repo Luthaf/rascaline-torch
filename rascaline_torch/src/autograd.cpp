@@ -234,7 +234,7 @@ torch::autograd::variable_list RascalinePositionsGrad::forward(
     torch::Tensor cell
 ) {
     const auto& densified_positions = descriptor->densified_positions();
-    if (densified_positions.size() == 0) {
+    if (values_grad.sizes()[0] != 0 && densified_positions.size() == 0) {
         throw RascalError("missing gradients in call to backward. Did you set the correct hyper-parameters?");
     }
 
