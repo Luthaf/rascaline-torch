@@ -6,11 +6,28 @@ import subprocess
 from setuptools import setup, Extension
 from wheel.bdist_wheel import bdist_wheel
 from distutils.command.build_ext import build_ext  # type: ignore
+from packaging.version import Version
+
+import torch
 
 ROOT = os.path.realpath(os.path.dirname(__file__))
 
+
 if sys.version_info < (3, 6):
-    sys.exit("Sorry, Python < 3.6 is not supported")
+    raise Exception("Python < 3.6 is not supported")
+
+TORCH_VERSION = Version(torch.__version__)
+
+if TORCH_VERSION < Version("1.9"):
+    raise Exception("Torch < 1.9 is not supported")
+
+if sys.platform.startswith("darwin"):
+    if TORCH_VERSION.minor == 10:
+        raise Exception(
+            "Torch 1.10 fails to build custom extensions on macOS "
+            "(cf https://github.com/pytorch/pytorch/issues/65000), "
+            "please use torch 1.9 instead"
+        )
 
 
 class universal_wheel(bdist_wheel):
