@@ -1,11 +1,13 @@
-import os
-import sys
 import glob
+import os
 import subprocess
+import sys
 
-from setuptools import setup, Extension
+from setuptools import Extension, setup
+from setuptools.command.build_ext import build_ext
 from wheel.bdist_wheel import bdist_wheel
-from distutils.command.build_ext import build_ext  # type: ignore
+
+from distutils.command.install import install  # isort: skip
 
 ROOT = os.path.realpath(os.path.dirname(__file__))
 
@@ -75,10 +77,6 @@ setup(
     cmdclass={
         "build_ext": cmake_ext,
         "bdist_wheel": universal_wheel,
-    },
-    package_data={
-        "rascaline_torch": [
-            "rascaline_torch/*",
-        ]
+        "install": install,
     },
 )
