@@ -1,9 +1,8 @@
 from typing import TYPE_CHECKING
 
+import rascaline
 import torch
 from torch import Tensor
-import rascaline
-
 
 if TYPE_CHECKING:
     # define a dummy class with the same interface to make mypy happy
@@ -23,28 +22,27 @@ if TYPE_CHECKING:
         def cell(self) -> Tensor:
             pass
 
-
 else:
     System = torch.classes.rascaline.System
 
 
-def as_torch_system(frame, requires_grad=False):
+def as_torch_system(frame, positions_requires_grad=False, cell_requires_grad=False):
     system = rascaline.systems.wrap_system(frame)
 
     return System(
-        torch.tensor(
+        species=torch.tensor(
             system.species(),
             requires_grad=False,
-            dtype=torch.int,
+            dtype=torch.int32,
         ),
-        torch.tensor(
+        positions=torch.tensor(
             system.positions(),
-            requires_grad=requires_grad,
+            requires_grad=positions_requires_grad,
             dtype=torch.double,
         ),
-        torch.tensor(
+        cell=torch.tensor(
             system.cell(),
-            requires_grad=False,
+            requires_grad=cell_requires_grad,
             dtype=torch.double,
         ),
     )

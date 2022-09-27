@@ -40,7 +40,7 @@ if (BUILD_FOR_PYTHON)
     # add path to the cmake configuration of the version of librascaline used
     # by the Python rascaline module.
     execute_process(
-        COMMAND ${PYTHON_EXECUTABLE} -c "import rascaline; print(rascaline.clib.cmake_prefix_path)"
+        COMMAND ${PYTHON_EXECUTABLE} -c "import rascaline; print(rascaline._c_lib.cmake_prefix_path)"
         RESULT_VARIABLE RASCALINE_CMAKE_PATH_RESULT
         OUTPUT_VARIABLE RASCALINE_CMAKE_PATH_OUTPUT
         ERROR_VARIABLE RASCALINE_CMAKE_PATH_ERROR
@@ -54,21 +54,17 @@ if (BUILD_FOR_PYTHON)
     set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};${RASCALINE_CMAKE_PATH_OUTPUT}")
 endif(BUILD_FOR_PYTHON)
 
-find_package(Torch 1.9 REQUIRED)
+find_package(Torch 1.11 REQUIRED)
 
 if (NOT TARGET rascaline)
     find_package(rascaline 0.1 REQUIRED)
 endif()
 
-set_property(TARGET caffe2::mkl PROPERTY INTERFACE_LINK_LIBRARIES)
-set_property(TARGET caffe2::mkldnn PROPERTY INTERFACE_LINK_LIBRARIES)
-
 add_library(rascaline_torch SHARED
-    rascaline_torch/src/interner.cpp
-    rascaline_torch/src/system.cpp
-    rascaline_torch/src/autograd.cpp
-    rascaline_torch/src/descriptor.cpp
-    rascaline_torch/src/register.cpp
+    src/rascaline_torch/cxx/equistore_torch.cpp
+    src/rascaline_torch/cxx/system.cpp
+    src/rascaline_torch/cxx/autograd.cpp
+    src/rascaline_torch/cxx/register.cpp
 )
 
 target_link_libraries(rascaline_torch torch rascaline)

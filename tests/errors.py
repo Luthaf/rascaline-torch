@@ -1,8 +1,8 @@
 import unittest
-import copy
 
-import torch
 import rascaline
+import torch
+
 from rascaline_torch import Calculator, System
 
 HYPERS = {
@@ -10,7 +10,7 @@ HYPERS = {
     "max_radial": 6,
     "max_angular": 6,
     "atomic_gaussian_width": 0.3,
-    "gradients": False,
+    "center_atom_weight": 1.0,
     "cutoff_function": {"ShiftedCosine": {"width": 0.5}},
     "radial_basis": {"Gto": {}},
 }
@@ -18,7 +18,7 @@ HYPERS = {
 
 class TestErrors(unittest.TestCase):
     def setUp(self):
-        self.calculator = Calculator(rascaline.SphericalExpansion(**HYPERS), [1, 2])
+        self.calculator = Calculator(rascaline.SphericalExpansion(**HYPERS))
 
         self.system = System(
             positions=torch.tensor([[0, 0, 0], [1, 1, 1]], dtype=torch.float64),
@@ -28,19 +28,12 @@ class TestErrors(unittest.TestCase):
 
     def test_bad_calculator(self):
         with self.assertRaises(ValueError) as cm:
-            Calculator(3, [])
+            _ = Calculator(3)
 
         self.assertEqual(
             str(cm.exception),
-            "the calculator must be one of rascaline calculator, got a value of type <class 'int'>",
-        )
-
-        with self.assertRaises(ValueError) as cm:
-            Calculator(rascaline.SphericalExpansion(**HYPERS), [1, "3"])
-
-        self.assertEqual(
-            str(cm.exception),
-            "species must be provided as an array of integers",
+            "the calculator must be one of rascaline calculator, got a value "
+            "of type <class 'int'>",
         )
 
     def test_system_species_dtype(self):
@@ -212,17 +205,4 @@ class TestErrors(unittest.TestCase):
         self.assertEqual(
             str(cm.exception),
             "unit cell must be stored as a contiguous tensor on CPU",
-        )
-
-    def test_system_cell_grad(self):
-        with self.assertRaises(RuntimeError) as cm:
-            _ = System(
-                species=self.system.species,
-                positions=self.system.positions,
-                cell=torch.zeros((3, 3), dtype=torch.float64, requires_grad=True),
-            )
-
-        self.assertEqual(
-            str(cm.exception),
-            "we can not track the gradient with respect to the cell yet",
         )

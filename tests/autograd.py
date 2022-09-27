@@ -1,7 +1,8 @@
 import unittest
 
-import torch
+import ase
 import rascaline
+import torch
 
 import rascaline_torch
 
@@ -9,10 +10,10 @@ torch.manual_seed(0)
 
 HYPERS = {
     "cutoff": 3,
-    "max_radial": 6,
-    "max_angular": 6,
+    "max_radial": 2,
+    "max_angular": 0,
     "atomic_gaussian_width": 0.3,
-    "gradients": True,
+    "center_atom_weight": 1.0,
     "cutoff_function": {"ShiftedCosine": {"width": 0.5}},
     "radial_basis": {"Gto": {}},
 }
@@ -22,28 +23,20 @@ class TestFiniteDifferences(unittest.TestCase):
     def _create_random_system(self, n_atoms, cell_size):
         species = torch.randint(3, (n_atoms,), dtype=torch.int)
 
-        positions = cell_size / 2 * torch.randn((n_atoms, 3), dtype=torch.float64)
-        positions += cell_size / 2
-
-        cell = torch.tensor(
-            [
-                [cell_size, 0, 0],
-                [0, cell_size, 0],
-                [0, 0, cell_size],
-            ],
-            dtype=torch.float64,
+        cell = ase.cell.Cell.new(
+            [cell_size, 1.4 * cell_size, 0.8 * cell_size, 90, 80, 110]
         )
+        cell = torch.tensor(cell[:], dtype=torch.float64)
+
+        positions = torch.rand((n_atoms, 3), dtype=torch.float64) @ cell
 
         return species, positions, cell
 
-    def test_spherical_expansion(self):
+    def test_spherical_expansion_positions_grad(self):
         species, positions, cell = self._create_random_system(n_atoms=75, cell_size=5.0)
         positions.requires_grad = True
 
-        model = rascaline_torch.Calculator(
-            rascaline.SphericalExpansion(**HYPERS),
-            species=[0, 1, 2],
-        )
+        calculator = rascaline_torch.Calculator(rascaline.SphericalExpansion(**HYPERS))
 
         def compute(positions, species, cell):
             system = rascaline_torch.System(
@@ -51,26 +44,64 @@ class TestFiniteDifferences(unittest.TestCase):
                 species=species,
                 cell=cell,
             )
-            return model(system).values
+            descriptor = calculator(system)
+            descriptor.components_to_properties("spherical_harmonics_m")
+            descriptor.keys_to_properties("spherical_harmonics_l")
+
+            descriptor.keys_to_samples("species_center")
+            descriptor.keys_to_properties("species_neighbor")
+
+            return descriptor.block().values
 
         self.assertTrue(
             torch.autograd.gradcheck(
                 compute,
                 (positions, species, cell),
-                eps=1e-12,
-                atol=1e-2,
                 fast_mode=True,
             )
         )
 
-    def test_power_spectrum(self):
+    def test_spherical_expansion_cell_grad(self):
+        species, positions, cell = self._create_random_system(n_atoms=75, cell_size=5.0)
+
+        original_cell = cell.clone()
+        cell.requires_grad = True
+
+        calculator = rascaline_torch.Calculator(rascaline.SphericalExpansion(**HYPERS))
+
+        def compute(positions, species, cell):
+            # modifying the cell for numerical gradients should also displace
+            # the atoms
+            fractional = positions @ torch.linalg.inv(original_cell)
+            positions = fractional @ cell.detach()
+
+            system = rascaline_torch.System(
+                positions=positions,
+                species=species,
+                cell=cell,
+            )
+            descriptor = calculator(system)
+            descriptor.components_to_properties("spherical_harmonics_m")
+            descriptor.keys_to_properties("spherical_harmonics_l")
+
+            descriptor.keys_to_samples("species_center")
+            descriptor.keys_to_properties("species_neighbor")
+
+            return descriptor.block().values
+
+        self.assertTrue(
+            torch.autograd.gradcheck(
+                compute,
+                (positions, species, cell),
+                fast_mode=True,
+            )
+        )
+
+    def test_power_spectrum_positions_grad(self):
         species, positions, cell = self._create_random_system(n_atoms=75, cell_size=5.0)
         positions.requires_grad = True
 
-        model = rascaline_torch.Calculator(
-            rascaline.SoapPowerSpectrum(**HYPERS),
-            species=[0, 1, 2],
-        )
+        calculator = rascaline_torch.Calculator(rascaline.SoapPowerSpectrum(**HYPERS))
 
         def compute(positions, species, cell):
             system = rascaline_torch.System(
@@ -78,51 +109,51 @@ class TestFiniteDifferences(unittest.TestCase):
                 species=species,
                 cell=cell,
             )
-            return model(system).values
+            descriptor = calculator(system)
+
+            descriptor.keys_to_samples("species_center")
+            descriptor.keys_to_properties(["species_neighbor_1", "species_neighbor_2"])
+
+            return descriptor.block().values
 
         self.assertTrue(
             torch.autograd.gradcheck(
                 compute,
                 (positions, species, cell),
-                eps=1e-12,
-                atol=1e-2,
                 fast_mode=True,
             )
         )
 
-    def test_forces_gradients(self):
+    def test_power_spectrum_cell_grad(self):
         species, positions, cell = self._create_random_system(n_atoms=75, cell_size=5.0)
-        positions.requires_grad = True
-        system = rascaline_torch.System(
-            positions=positions,
-            species=species,
-            cell=cell,
-        )
 
-        model = rascaline_torch.Calculator(
-            rascaline.SphericalExpansion(**HYPERS),
-            species=[0, 1, 2],
-        )
+        original_cell = cell.clone()
+        cell.requires_grad = True
 
-        def compute(weights):
-            energy = model(system).values.sum(dim=0) @ weights.T
-            (forces,) = torch.autograd.grad(
-                energy,
-                system.positions,
-                grad_outputs=-torch.ones_like(energy),
-                create_graph=True,
-                retain_graph=True,
+        calculator = rascaline_torch.Calculator(rascaline.SoapPowerSpectrum(**HYPERS))
+
+        def compute(positions, species, cell):
+            # modifying the cell for numerical gradients should also displace
+            # the atoms
+            fractional = positions @ torch.linalg.inv(original_cell)
+            positions = fractional @ cell.detach()
+
+            system = rascaline_torch.System(
+                positions=positions,
+                species=species,
+                cell=cell,
             )
-            return forces
+            descriptor = calculator(system)
 
-        weights = torch.rand((1, 882), dtype=torch.float64, requires_grad=True)
-        # check that we can compute gradients of forces w.r.t. weights of a model
+            descriptor.keys_to_samples("species_center")
+            descriptor.keys_to_properties(["species_neighbor_1", "species_neighbor_2"])
+
+            return descriptor.block().values
+
         self.assertTrue(
             torch.autograd.gradcheck(
                 compute,
-                (weights),
-                eps=1e-12,
-                atol=1e-2,
+                (positions, species, cell),
                 fast_mode=True,
             )
         )
