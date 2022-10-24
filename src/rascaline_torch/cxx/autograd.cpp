@@ -180,7 +180,19 @@ torch::autograd::variable_list RascalineAutograd::backward(
         auto positions_grad_accessor = positions_grad.accessor<double, 2>();
         for (size_t block_i=0; block_i<n_blocks; block_i++) {
             auto grad_values = grad_outputs[block_i];
-            auto forward_grads = positions_grad_per_block[block_i];
+            always_assert(grad_values.is_contiguous() && grad_values.is_cpu());
+
+            auto grad_values_ptr = grad_values.data_ptr<double>();
+            // total size of component + property dimension
+            size_t dot_dimensions = 1;
+            for (int i=1; i<grad_values.sizes().size(); i++) {
+                dot_dimensions *= grad_values.size(i);
+            }
+
+            auto forward_grad = positions_grad_per_block[block_i];
+            always_assert(forward_grad.is_contiguous() && forward_grad.is_cpu());
+            auto forward_grad_ptr = forward_grad.data_ptr<double>();
+
             auto grad_samples = positions_grad_samples[block_i].accessor<int32_t, 2>();
 
             for (int64_t grad_sample_i=0; grad_sample_i<grad_samples.sizes()[0]; grad_sample_i++) {
@@ -191,10 +203,13 @@ torch::autograd::variable_list RascalineAutograd::backward(
                 auto global_atom = structures_start[structure] + atom;
 
                 for (int64_t direction=0; direction<3; direction++) {
-                    auto grad_value = grad_values.index({sample, "..."}).reshape({-1});
-                    auto forward_grad = forward_grads.index({grad_sample_i, direction, "..."}).reshape({-1});
-
-                    positions_grad_accessor[global_atom][direction] += grad_value.dot(forward_grad).item<double>();
+                    auto dot = 0.0;
+                    for (int64_t i=0; i<dot_dimensions; i++) {
+                        auto dX_dr = forward_grad_ptr[(grad_sample_i * 3 + direction) * dot_dimensions + i];
+                        auto dl_dX = grad_values_ptr[sample * dot_dimensions + i];
+                        dot += dX_dr * dl_dX;
+                    }
+                    positions_grad_accessor[global_atom][direction] += dot;
                 }
             }
         }
@@ -210,7 +225,19 @@ torch::autograd::variable_list RascalineAutograd::backward(
         auto cell_grad_accessor = cell_grad.accessor<double, 2>();
         for (size_t block_i=0; block_i<n_blocks; block_i++) {
             auto grad_values = grad_outputs[block_i];
-            auto forward_grads = cell_grad_per_block[block_i];
+            always_assert(grad_values.is_contiguous() && grad_values.is_cpu());
+
+            auto grad_values_ptr = grad_values.data_ptr<double>();
+            // total size of component + property dimension
+            size_t dot_dimensions = 1;
+            for (int i=1; i<grad_values.sizes().size(); i++) {
+                dot_dimensions *= grad_values.size(i);
+            }
+
+            auto forward_grad = cell_grad_per_block[block_i];
+            always_assert(forward_grad.is_contiguous() && forward_grad.is_cpu());
+            auto forward_grad_ptr = forward_grad.data_ptr<double>();
+
             auto values_samples = samples_per_block[block_i].accessor<int32_t, 2>();
             auto grad_samples = cell_grad_samples[block_i].accessor<int32_t, 2>();
 
@@ -221,11 +248,22 @@ torch::autograd::variable_list RascalineAutograd::backward(
 
                 for (int64_t direction_1=0; direction_1<3; direction_1++) {
                     for (int64_t direction_2=0; direction_2<3; direction_2++) {
-                        auto grad_value = grad_values.index({sample, "..."}).reshape({-1});
-                        // TODO: figure out why we need a transpose here?
-                        auto forward_grad = forward_grads.index({grad_sample_i, direction_2, direction_1, "..."}).reshape({-1});
+                        // auto grad_value = grad_values.index({sample, "..."}).reshape({-1});
+                        // // TODO: figure out why we need a transpose here?
+                        // auto forward_grad = forward_grads.index({grad_sample_i, direction_2, direction_1, "..."}).reshape({-1});
 
-                        cell_grad_accessor[3 * structure + direction_1][direction_2] += grad_value.dot(forward_grad).item<double>();
+                        // cell_grad_accessor[3 * structure + direction_1][direction_2] += grad_value.dot(forward_grad).item<double>();
+
+
+                        auto dot = 0.0;
+                        for (int64_t i=0; i<dot_dimensions; i++) {
+                            // TODO: figure out why we need a transpose here?
+                            auto id = (grad_sample_i * 3 + direction_2) * 3 + direction_1;
+                            auto dX_dr = forward_grad_ptr[id * dot_dimensions + i];
+                            auto dl_dX = grad_values_ptr[sample * dot_dimensions + i];
+                            dot += dX_dr * dl_dX;
+                        }
+                        cell_grad_accessor[3 * structure + direction_1][direction_2] += dot;
                     }
                 }
             }
