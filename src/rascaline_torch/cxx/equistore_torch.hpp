@@ -31,7 +31,7 @@ public:
 
     std::unique_ptr<DataArrayBase> create(std::vector<uintptr_t> shape) const override;
 
-    const double* data() const override;
+    double* data() override;
 
     const std::vector<uintptr_t>& shape() const override;
 

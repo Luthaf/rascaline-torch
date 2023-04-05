@@ -43,3 +43,7 @@ class TestCalculator(unittest.TestCase):
         # expected = model(self.system)
 
         # self.assertTrue(torch.all(result.values == expected.values))
+
+
+if __name__ == "__main__":
+    unittest.main()

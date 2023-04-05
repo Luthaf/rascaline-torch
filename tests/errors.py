@@ -206,3 +206,7 @@ class TestErrors(unittest.TestCase):
             str(cm.exception),
             "unit cell must be stored as a contiguous tensor on CPU",
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

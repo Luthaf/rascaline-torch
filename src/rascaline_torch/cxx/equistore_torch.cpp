@@ -43,7 +43,7 @@ std::unique_ptr<DataArrayBase> TorchDataArray::create(std::vector<uintptr_t> sha
     ));
 }
 
-const double* TorchDataArray::data() const {
+double* TorchDataArray::data() {
     if (!this->tensor_.device().is_cpu()) {
         throw equistore::Error("can not access the data of a tensor not on CPU");
     }
@@ -56,7 +56,7 @@ const double* TorchDataArray::data() const {
         throw equistore::Error("TODO");
     }
 
-    return static_cast<const double*>(this->tensor_.data_ptr());
+    return static_cast<double*>(this->tensor_.data_ptr());
 }
 
 const std::vector<uintptr_t>& TorchDataArray::shape() const {

@@ -45,11 +45,11 @@ class TestFiniteDifferences(unittest.TestCase):
                 cell=cell,
             )
             descriptor = calculator(system)
-            descriptor.components_to_properties("spherical_harmonics_m")
-            descriptor.keys_to_properties("spherical_harmonics_l")
+            descriptor = descriptor.components_to_properties("spherical_harmonics_m")
+            descriptor = descriptor.keys_to_properties("spherical_harmonics_l")
 
-            descriptor.keys_to_samples("species_center")
-            descriptor.keys_to_properties("species_neighbor")
+            descriptor = descriptor.keys_to_samples("species_center")
+            descriptor = descriptor.keys_to_properties("species_neighbor")
 
             return descriptor.block().values
 
@@ -81,11 +81,11 @@ class TestFiniteDifferences(unittest.TestCase):
                 cell=cell,
             )
             descriptor = calculator(system)
-            descriptor.components_to_properties("spherical_harmonics_m")
-            descriptor.keys_to_properties("spherical_harmonics_l")
+            descriptor = descriptor.components_to_properties("spherical_harmonics_m")
+            descriptor = descriptor.keys_to_properties("spherical_harmonics_l")
 
-            descriptor.keys_to_samples("species_center")
-            descriptor.keys_to_properties("species_neighbor")
+            descriptor = descriptor.keys_to_samples("species_center")
+            descriptor = descriptor.keys_to_properties("species_neighbor")
 
             return descriptor.block().values
 
@@ -111,8 +111,10 @@ class TestFiniteDifferences(unittest.TestCase):
             )
             descriptor = calculator(system)
 
-            descriptor.keys_to_samples("species_center")
-            descriptor.keys_to_properties(["species_neighbor_1", "species_neighbor_2"])
+            descriptor = descriptor.keys_to_samples("species_center")
+            descriptor = descriptor.keys_to_properties(
+                ["species_neighbor_1", "species_neighbor_2"]
+            )
 
             return descriptor.block().values
 
@@ -145,8 +147,10 @@ class TestFiniteDifferences(unittest.TestCase):
             )
             descriptor = calculator(system)
 
-            descriptor.keys_to_samples("species_center")
-            descriptor.keys_to_properties(["species_neighbor_1", "species_neighbor_2"])
+            descriptor = descriptor.keys_to_samples("species_center")
+            descriptor = descriptor.keys_to_properties(
+                ["species_neighbor_1", "species_neighbor_2"]
+            )
 
             return descriptor.block().values
 
@@ -157,3 +161,7 @@ class TestFiniteDifferences(unittest.TestCase):
                 fast_mode=True,
             )
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

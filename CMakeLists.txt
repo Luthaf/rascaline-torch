@@ -40,7 +40,7 @@ if (BUILD_FOR_PYTHON)
     # add path to the cmake configuration of the version of librascaline used
     # by the Python rascaline module.
     execute_process(
-        COMMAND ${PYTHON_EXECUTABLE} -c "import rascaline; print(rascaline._c_lib.cmake_prefix_path)"
+        COMMAND ${PYTHON_EXECUTABLE} -c "import rascaline; print(rascaline.utils.cmake_prefix_path)"
         RESULT_VARIABLE RASCALINE_CMAKE_PATH_RESULT
         OUTPUT_VARIABLE RASCALINE_CMAKE_PATH_OUTPUT
         ERROR_VARIABLE RASCALINE_CMAKE_PATH_ERROR
@@ -50,7 +50,7 @@ if (BUILD_FOR_PYTHON)
         message(FATAL_ERROR "failed to find your rascaline installation\n${RASCALINE_CMAKE_PATH_ERROR}")
     endif()
 
-    string(STRIP ${RASCALINE_CMAKE_PATH_OUTPUT} RASCALINE_CMAKE_PATH_OUTPUT)
+    string(STRIP "${RASCALINE_CMAKE_PATH_OUTPUT}" RASCALINE_CMAKE_PATH_OUTPUT)
     set(CMAKE_PREFIX_PATH "${CMAKE_PREFIX_PATH};${RASCALINE_CMAKE_PATH_OUTPUT}")
 endif(BUILD_FOR_PYTHON)
 
