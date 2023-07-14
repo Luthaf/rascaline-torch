@@ -18,7 +18,7 @@ deps =
     discover
     ase
     torch >=1.11
-    rascaline@git+https://github.com/Luthaf/rascaline
+    rascaline @ https://github.com/Luthaf/rascaline/archive/881de9b.zip
 
 commands =
     python setup.py --quiet install
