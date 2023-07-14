@@ -4,7 +4,7 @@ requires = [
     "wheel >=0.38",
     "torch >=1.11",
     "cmake",
-    "rascaline@git+https://github.com/Luthaf/rascaline",
+    "rascaline @ https://github.com/Luthaf/rascaline/archive/881de9b.zip",
 ]
 build-backend = "setuptools.build_meta"
 
