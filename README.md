@@ -35,7 +35,7 @@ calculator = rascaline_torch.Calculator(
 
 # compute spherical expansion
 frames = ase.io.read(...)
-system = rascaline_torch.as_torch_system(frames[0], requires_grad=True)
+system = rascaline_torch.as_torch_system(frames[0], positions_requires_grad=True)
 
 # descriptor has three attributes: values, samples and features
 descriptor = calculator(system)
