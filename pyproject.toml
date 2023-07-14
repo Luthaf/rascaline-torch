@@ -3,8 +3,8 @@ requires = [
     "setuptools >=61",
     "wheel >=0.38",
     "torch >=1.11",
-    "rascaline @ https://github.com/Luthaf/rascaline/archive/ff621db.zip",
     "cmake",
+    "rascaline @ https://github.com/Luthaf/rascaline/archive/881de9b.zip",
 ]
 build-backend = "setuptools.build_meta"
 
@@ -18,7 +18,7 @@ deps =
     discover
     ase
     torch >=1.11
-    rascaline @ https://github.com/Luthaf/rascaline/archive/ff621db.zip
+    rascaline @ https://github.com/Luthaf/rascaline/archive/881de9b.zip
 
 commands =
     python setup.py --quiet install

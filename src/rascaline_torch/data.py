@@ -1,8 +1,8 @@
 import ctypes
 
-import equistore.data
+import equistore.core.data
 import torch
-from equistore._c_api import eqs_array_t
+from equistore.core._c_api import eqs_array_t
 
 _eqs_array_to_tensor = torch.ops.rascaline.eqs_array_to_tensor
 
@@ -22,7 +22,7 @@ class TorchDataArray(torch.Tensor):
 
 
 def _register_cxx_torch_tensor_with_equistore():
-    equistore.data.register_external_data_wrapper(
+    equistore.core.data.register_external_data_wrapper(
         "equistore_torch::TorchDataArray",
         TorchDataArray,
     )

@@ -372,7 +372,7 @@ equistore::TensorMap descriptor_to_torch(
         for (const auto& parameter: block.gradients_list()) {
             if (parameter == "positions") {
                 auto gradient = block.gradient("positions");
-                auto gradient_tensor = ndarray_to_tensor(gradient.data());
+                auto gradient_tensor = ndarray_to_tensor(gradient.values());
 
                 always_assert(gradient.components()[0].names().size() == 1);
                 always_assert(gradient.components()[0].names()[0] == std::string("direction"));
@@ -386,16 +386,19 @@ equistore::TensorMap descriptor_to_torch(
                 positions_grad_samples.push_back(labels_to_tensor(gradient.samples()));
 
                 if (keep_forward_grad) {
-                    new_block.add_gradient(
-                        "positions",
+                    auto gradient_block =  equistore::TensorBlock(
                         std::unique_ptr<equistore::DataArrayBase>(new equistore::TorchDataArray(gradient_tensor)),
                         gradient.samples(),
-                        gradient.components()
-                    );
+                        gradient.components(),
+                        gradient.properties());
+
+                    new_block.add_gradient(
+                        "positions",
+                        std::move(gradient_block));
                 }
             } else if (parameter == "cell") {
                 auto gradient = block.gradient("cell");
-                auto gradient_tensor = ndarray_to_tensor(gradient.data());
+                auto gradient_tensor = ndarray_to_tensor(gradient.values());
 
                 always_assert(gradient.components().at(0).names().size() == 1);
                 always_assert(gradient.components().at(0).names()[0] == std::string("direction_1"));
@@ -409,11 +412,16 @@ equistore::TensorMap descriptor_to_torch(
                 cell_grad_samples.push_back(labels_to_tensor(gradient.samples()));
 
                 if (keep_forward_grad) {
-                    new_block.add_gradient(
-                        "cell",
+                    
+                    auto gradient_block = equistore::TensorBlock(
                         std::unique_ptr<equistore::DataArrayBase>(new equistore::TorchDataArray(gradient_tensor)),
                         gradient.samples(),
-                        gradient.components()
+                        gradient.components(),
+                        gradient.properties());
+
+                    new_block.add_gradient(
+                        "cell",
+                        std::move(gradient_block)
                     );
                 }
             } else {

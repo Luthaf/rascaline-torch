@@ -29,13 +29,14 @@ HYPER_PARAMETERS = {
 # you need to specify which neighboring species will be taken into account by
 # the model
 calculator = rascaline_torch.Calculator(
-    rascaline.SphericalExpansion(**HYPER_PARAMETERS),
-    species=[1, 6, 8]
+    rascaline.SphericalExpansion(**HYPER_PARAMETERS)
 )
 
 # compute spherical expansion
 frames = ase.io.read(...)
-system = rascaline_torch.as_torch_system(frames[0], requires_grad=True)
+system = rascaline_torch.as_torch_system(frames[0], 
+                                         positions_requires_grad=True,
+                                         cell_requires_grad=False)
 
 # descriptor has three attributes: values, samples and features
 descriptor = calculator(system)
