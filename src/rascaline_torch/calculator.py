@@ -3,7 +3,7 @@ from typing import List, Optional, Union
 
 import torch
 from equistore import TensorMap
-from equistore._c_api import eqs_tensormap_t
+from equistore.core._c_api import eqs_tensormap_t
 from rascaline.calculators import CalculatorBase
 
 from .system import System
