@@ -179,7 +179,9 @@ torch::autograd::variable_list RascalineAutograd::backward(
         positions_grad = torch::zeros_like(all_positions);
         auto positions_grad_accessor = positions_grad.accessor<double, 2>();
         for (size_t block_i=0; block_i<n_blocks; block_i++) {
-            auto grad_values = grad_outputs[block_i];
+            
+            auto tmp_grad_values = grad_outputs[block_i];
+            auto grad_values = tmp_grad_values.contiguous();
             always_assert(grad_values.is_contiguous() && grad_values.is_cpu());
 
             auto grad_values_ptr = grad_values.data_ptr<double>();
@@ -189,7 +191,9 @@ torch::autograd::variable_list RascalineAutograd::backward(
                 dot_dimensions *= grad_values.size(i);
             }
 
-            auto forward_grad = positions_grad_per_block[block_i];
+            auto tmp_forward_grad = positions_grad_per_block[block_i];
+            auto forward_grad = tmp_forward_grad.contiguous();
+
             always_assert(forward_grad.is_contiguous() && forward_grad.is_cpu());
             auto forward_grad_ptr = forward_grad.data_ptr<double>();
 
@@ -224,7 +228,10 @@ torch::autograd::variable_list RascalineAutograd::backward(
         cell_grad = torch::zeros_like(all_cells);
         auto cell_grad_accessor = cell_grad.accessor<double, 2>();
         for (size_t block_i=0; block_i<n_blocks; block_i++) {
-            auto grad_values = grad_outputs[block_i];
+            
+            auto tmp_grad_values = grad_outputs[block_i];
+            auto grad_values = tmp_grad_values.contiguous();
+            
             always_assert(grad_values.is_contiguous() && grad_values.is_cpu());
 
             auto grad_values_ptr = grad_values.data_ptr<double>();
@@ -234,7 +241,9 @@ torch::autograd::variable_list RascalineAutograd::backward(
                 dot_dimensions *= grad_values.size(i);
             }
 
-            auto forward_grad = cell_grad_per_block[block_i];
+            auto tmp_forward_grad = cell_grad_per_block[block_i];
+            auto forward_grad = tmp_forward_grad.contiguous();
+
             always_assert(forward_grad.is_contiguous() && forward_grad.is_cpu());
             auto forward_grad_ptr = forward_grad.data_ptr<double>();
 
