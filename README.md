@@ -1,3 +1,8 @@
+> [!IMPORTANT]
+> This repository has been merged in the main [rascaline repository](https://github.com/Luthaf/rascaline/),
+> and is kept online for archival purposes only.
+
+
 # Integration between rascaline & pytorch
 
 ## Installation
